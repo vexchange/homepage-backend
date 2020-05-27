@@ -22,6 +22,12 @@ class RoiInfo {
   }
 }
 
+const handler = {
+  get: function(target, name) {
+    return target.hasOwnProperty(name) ? target[name] : 0;
+  }
+};
+    
 (async () => { const { number: CURRENT_BLOCK } = await web3.eth.getBlock("latest");
 
   const loadExchangeData = async ([tokenAddress, exchangeAddress]) => {
@@ -243,20 +249,55 @@ class RoiInfo {
     }, () => {
       console.log(
         `trade volume: ${tradeVolume}`,
-        `vet bought: ${vetBought}`,
+        `vet bought: ${vetBought}`
         `token balance: ${tokenBalance}`
       );
     });
   };
 
+  const populateVolume = data => {
+    let totalTradeVolume = new Proxy({}, handler);
+    let volume = [];
+
+    async.forEach(data.infos, async (info) => {
+      const exchange = new web3.eth.Contract(config.EXCHANGE_ABI, info.exchangeAddress);
+      const events = await exchange.getPastEvents('allEvents');
+
+      let tradeVolume = new Proxy({}, handler);
+
+      async.forEach(events, event => {
+        if (event.raw.topics[0] == config.EVENT_ETH_PURCHASE) {
+          let vetBought = ethers.utils.bigNumberify(event.returnValues.eth_bought);
+
+          tradeVolume[event.returnValues.buyer] += parseInt(ethers.utils.formatEther(vetBought)) / 0.997;
+          totalTradeVolume[event.returnValues.buyer] += parseInt(ethers.utils.formatEther(vetBought)) / 0.997;
+        } else if (event.raw.topics[0] == config.EVENT_TOKEN_PURCHASE) {
+          let vetSold = ethers.utils.bigNumberify(event.returnValues.eth_sold);
+
+          tradeVolume[event.returnValues.buyer] += parseInt(ethers.utils.formatEther(vetSold));
+          totalTradeVolume[event.returnValues.buyer] += parseInt(ethers.utils.formatEther(vetSold));
+        }
+
+        volume.push(tradeVolume);
+      });
+
+      let totalVolume = Object.values(totalTradeVolume).reduce((a, b) => a + b, 0);
+
+      totalTradeVolume.forEach((t, v) => {
+        console.log(v)
+      });
+
+      //volume.forEach(vol => {
+      //  let filteredVol = new Proxy({}, handler);
+      //  vol.forEach((t, v) => {
+      //  });
+      //});
+
+    });
+  };
+
   const main = async () => {
     // set default value in providers
-    const handler = {
-      get: function(target, name) {
-        return target.hasOwnProperty(name) ? target[name] : 0;
-      }
-    };
-    
     const data = {
       infos: [],
       logs: [],
@@ -269,9 +310,8 @@ class RoiInfo {
     data.infos = await loadExchangeInfos(data.infos);
     data.logs = await loadLogs(config.GENSIS_BLOCK_NUMBER, data.infos);
     data.providers = await populateProviders(data);
-    await populateRoi(data);
-
-    //populateVolume(data);
+    //await populateRoi(data);
+    await populateVolume(data);
   }
 
   main();
