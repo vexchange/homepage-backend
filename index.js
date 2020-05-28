@@ -136,10 +136,6 @@ const handler = {
     return _.flatten([...logs1, ...logs2]);
   };
 
-  const getChartRange = (start = config.GENSIS_BLOCK_NUMBER) => {
-    return _.range(start, CURRENT_BLOCK, config.HISTORY_CHUNK_SIZE);
-  };
-
   const populateProviders = data => {
     return new Promise(resolve => {
       async.forEach(data.infos, async (info) => {
@@ -175,8 +171,6 @@ const handler = {
   };
 
   const populateRoi = data => {
-    let dmNumerator = 1;
-    let dmDenominator = 1;
     let tradeVolume = 0;
     let vetBalance = 0;
     let tokenBalance = 0;
@@ -186,6 +180,9 @@ const handler = {
       const events = await exchange.getPastEvents('allEvents');
 
       async.forEach(events, event => {
+        let dmNumerator = 1;
+        let dmDenominator = 1;
+
         if (event.raw.topics[0] == config.EVENT_TRANSFER) {
           if (event.address == info.exchangeAddress) {
             return;
@@ -198,7 +195,7 @@ const handler = {
 
             if (tokenBalance > 0) {
               let value = ethers.utils.bigNumberify(event.returnValues._value);
-              dmNumerator *= tokenBalance + parseInt(ether.utils.formatEther(value), 10);
+              dmNumerator *= tokenBalance + parseInt(ethers.utils.formatEther(value), 10);
               dmDenominator *= tokenBalance;
             }
 
@@ -220,38 +217,40 @@ const handler = {
           tokenBalance -= parseInt(ethers.utils.formatEther(tBalance), 10);
         } else if (event.raw.topics[0] == config.EVENT_ETH_PURCHASE) {
           let vetBought = ethers.utils.bigNumberify(event.returnValues.eth_bought);
-          let tokenSold = ethers.utils.bigNumberify(event.returnValues.tokens_sold);
+          let tokensSold = ethers.utils.bigNumberify(event.returnValues.tokens_sold);
 
           let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetBought), 10);
-          let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokenSold), 10);
+          let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensSold), 10);
 
           dmNumerator *= vetNewBalance * tokenNewBalance;
-          dmDenominator *= parseInt(ethers.utils.formatEther(vetBought), 10) * tokenBalance;
+          dmDenominator *= vetBalance * tokenBalance;
+
           tradeVolume += parseInt(ethers.utils.formatEther(vetBought), 10) / 0.997;
           vetBought = vetNewBalance;
           tokenBalance = tokenNewBalance;
         } else {
           if (event.raw.topics[0] == config.EVENT_TOKEN_PURCHASE) {
             let vetSold = ethers.utils.bigNumberify(event.returnValues.eth_sold);
-            let tokenBought = ethers.utils.bigNumberify(event.returnValues.tokens_bought);
+            let tokensBought = ethers.utils.bigNumberify(event.returnValues.tokens_bought);
 
             let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetSold), 10);
-            let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokenBought), 10);
+            let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensBought), 10);
 
             dmNumerator *= vetNewBalance * tokenNewBalance;
-            dmDenominator *= parseInt(ethers.utils.formatEther(vetSold), 10) * tokenBalance;
+            dmDenominator *= vetBalance * tokenBalance;
+
             tradeVolume += parseInt(ethers.utils.formatEther(vetSold), 10);
             vetBought = vetNewBalance;
             tokenBalance = tokenNewBalance;
           }
         }
+
+        data.roi.push(
+          new RoiInfo(Math.sqrt(dmNumerator / dmDenominator), vetBalance, tokenBalance, tradeVolume)
+        )
       });
     }, () => {
-      console.log(
-        `trade volume: ${tradeVolume}`,
-        `vet bought: ${vetBought}`
-        `token balance: ${tokenBalance}`
-      );
+      return data.roi;
     });
   };
 
@@ -310,8 +309,8 @@ const handler = {
     data.infos = await loadExchangeInfos(data.infos);
     data.logs = await loadLogs(config.GENSIS_BLOCK_NUMBER, data.infos);
     data.providers = await populateProviders(data);
-    //await populateRoi(data);
-    await populateVolume(data);
+    data.roi = await populateRoi(data);
+    //await populateVolume(data);
   }
 
   main();

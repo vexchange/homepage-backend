@@ -1,3 +1,4 @@
+const web3 = require('web3');
 const FACTORY_ABI = require('./abi/factory.json');
 const EXCHANGE_ABI = require('./abi/exchange.json');
 const STR_ERC_20_ABI = require('./abi/str_erc_20.json');
@@ -24,4 +25,5 @@ module.exports = {
   EVENT_ETH_PURCHASE,
   EVENT_TOKEN_PURCHASE,
   LOGS_BLOCKS_CHUNK: 500,
+  ONE: web3.utils.toWei('1', 'ether'),
 };
