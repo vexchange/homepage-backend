@@ -175,92 +175,95 @@ const handler = {
     let vetBalance = 0;
     let tokenBalance = 0;
 
-    async.forEach(data.infos, async (info) => {
-      const exchange = new web3.eth.Contract(config.EXCHANGE_ABI, info.exchangeAddress);
-      const events = await exchange.getPastEvents('allEvents');
+    return new Promise((resolve) => {
 
-      async.forEach(events, event => {
-        let dmNumerator = 1;
-        let dmDenominator = 1;
+      async.forEach(data.infos, async (info) => {
+        const exchange = new web3.eth.Contract(config.EXCHANGE_ABI, info.exchangeAddress);
+        const events = await exchange.getPastEvents('allEvents');
 
-        if (event.raw.topics[0] == config.EVENT_TRANSFER) {
-          if (event.address == info.exchangeAddress) {
-            return;
-          } else {
-            if (event.event == 'Transfer') {
-              if (event.returnValues['_to'] != info.exchangeAddress) {
-                return;
+        async.forEach(events, event => {
+          let dmNumerator = 1;
+          let dmDenominator = 1;
+
+          if (event.raw.topics[0] == config.EVENT_TRANSFER) {
+            if (event.address == info.exchangeAddress) {
+              return;
+            } else {
+              if (event.event == 'Transfer') {
+                if (event.returnValues['_to'] != info.exchangeAddress) {
+                  return;
+                }
               }
-            }
 
-            if (tokenBalance > 0) {
+              if (tokenBalance > 0) {
+                let value = ethers.utils.bigNumberify(event.returnValues._value);
+                dmNumerator *= tokenBalance + parseInt(ethers.utils.formatEther(value), 10);
+                dmDenominator *= tokenBalance;
+              }
+
               let value = ethers.utils.bigNumberify(event.returnValues._value);
-              dmNumerator *= tokenBalance + parseInt(ethers.utils.formatEther(value), 10);
-              dmDenominator *= tokenBalance;
+
+              tokenBalance += parseInt(ethers.utils.bigNumberify(value));
             }
+          } else if (event.raw.topics[0] == config.EVENT_ADD_LIQUIDITY) {
+            let vBalance = ethers.utils.bigNumberify(event.returnValues['eth_amount']);
+            let tBalance = ethers.utils.bigNumberify(event.returnValues['token_amount']);
 
-            let value = ethers.utils.bigNumberify(event.returnValues._value);
+            vetBalance += parseInt(ethers.utils.formatEther(vBalance), 10);
+            tokenBalance += parseInt(ethers.utils.formatEther(tBalance), 10);
+          } else if (event.raw.topics[0] == config.EVENT_REMOVE_LIQUIDITY) {
+            let vBalance = ethers.utils.bigNumberify(event.returnValues['eth_amount']);
+            let tBalance = ethers.utils.bigNumberify(event.returnValues['token_amount']);
 
-            tokenBalance += parseInt(ethers.utils.bigNumberify(value));
-          }
-        } else if (event.raw.topics[0] == config.EVENT_ADD_LIQUIDITY) {
-          let vBalance = ethers.utils.bigNumberify(event.returnValues['eth_amount']);
-          let tBalance = ethers.utils.bigNumberify(event.returnValues['token_amount']);
+            vetBalance -= parseInt(ethers.utils.formatEther(vBalance), 10);
+            tokenBalance -= parseInt(ethers.utils.formatEther(tBalance), 10);
+          } else if (event.raw.topics[0] == config.EVENT_ETH_PURCHASE) {
+            let vetBought = ethers.utils.bigNumberify(event.returnValues.eth_bought);
+            let tokensSold = ethers.utils.bigNumberify(event.returnValues.tokens_sold);
 
-          vetBalance += parseInt(ethers.utils.formatEther(vBalance), 10);
-          tokenBalance += parseInt(ethers.utils.formatEther(tBalance), 10);
-        } else if (event.raw.topics[0] == config.EVENT_REMOVE_LIQUIDITY) {
-          let vBalance = ethers.utils.bigNumberify(event.returnValues['eth_amount']);
-          let tBalance = ethers.utils.bigNumberify(event.returnValues['token_amount']);
-
-          vetBalance -= parseInt(ethers.utils.formatEther(vBalance), 10);
-          tokenBalance -= parseInt(ethers.utils.formatEther(tBalance), 10);
-        } else if (event.raw.topics[0] == config.EVENT_ETH_PURCHASE) {
-          let vetBought = ethers.utils.bigNumberify(event.returnValues.eth_bought);
-          let tokensSold = ethers.utils.bigNumberify(event.returnValues.tokens_sold);
-
-          let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetBought), 10);
-          let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensSold), 10);
-
-          dmNumerator *= vetNewBalance * tokenNewBalance;
-          dmDenominator *= vetBalance * tokenBalance;
-
-          tradeVolume += parseInt(ethers.utils.formatEther(vetBought), 10) / 0.997;
-          vetBought = vetNewBalance;
-          tokenBalance = tokenNewBalance;
-        } else {
-          if (event.raw.topics[0] == config.EVENT_TOKEN_PURCHASE) {
-            let vetSold = ethers.utils.bigNumberify(event.returnValues.eth_sold);
-            let tokensBought = ethers.utils.bigNumberify(event.returnValues.tokens_bought);
-
-            let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetSold), 10);
-            let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensBought), 10);
+            let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetBought), 10);
+            let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensSold), 10);
 
             dmNumerator *= vetNewBalance * tokenNewBalance;
             dmDenominator *= vetBalance * tokenBalance;
 
-            tradeVolume += parseInt(ethers.utils.formatEther(vetSold), 10);
+            tradeVolume += parseInt(ethers.utils.formatEther(vetBought), 10) / 0.997;
             vetBought = vetNewBalance;
             tokenBalance = tokenNewBalance;
-          }
-        }
+          } else {
+            if (event.raw.topics[0] == config.EVENT_TOKEN_PURCHASE) {
+              let vetSold = ethers.utils.bigNumberify(event.returnValues.eth_sold);
+              let tokensBought = ethers.utils.bigNumberify(event.returnValues.tokens_bought);
 
-        data.roi.push(
-          new RoiInfo(Math.sqrt(dmNumerator / dmDenominator), vetBalance, tokenBalance, tradeVolume)
-        )
+              let vetNewBalance = vetBalance + parseInt(ethers.utils.formatEther(vetSold), 10);
+              let tokenNewBalance = tokenBalance + parseInt(ethers.utils.formatEther(tokensBought), 10);
+
+              dmNumerator *= vetNewBalance * tokenNewBalance;
+              dmDenominator *= vetBalance * tokenBalance;
+
+              tradeVolume += parseInt(ethers.utils.formatEther(vetSold), 10);
+              vetBought = vetNewBalance;
+              tokenBalance = tokenNewBalance;
+            }
+          }
+
+          data.roi.push(
+            new RoiInfo(Math.sqrt(dmNumerator / dmDenominator), vetBalance, tokenBalance, tradeVolume)
+          )
+        });
+      }, () => {
+        resolve(data.roi);
       });
-    }, () => {
-      return data.roi;
-    });
+    })
   };
 
   const populateVolume = data => {
-    let totalTradeVolume = new Proxy({}, handler);
-    let volume = [];
-
     async.forEach(data.infos, async (info) => {
       const exchange = new web3.eth.Contract(config.EXCHANGE_ABI, info.exchangeAddress);
       const events = await exchange.getPastEvents('allEvents');
+
+      let volume = [];
+      let totalTradeVolume = new Proxy({}, handler);
 
       let tradeVolume = new Proxy({}, handler);
 
@@ -281,17 +284,13 @@ const handler = {
       });
 
       let totalVolume = Object.values(totalTradeVolume).reduce((a, b) => a + b, 0);
-
-      totalTradeVolume.forEach((t, v) => {
-        console.log(v)
-      });
+      console.log(Object.entries(totalTradeVolume));
 
       //volume.forEach(vol => {
       //  let filteredVol = new Proxy({}, handler);
       //  vol.forEach((t, v) => {
       //  });
       //});
-
     });
   };
 
@@ -310,7 +309,7 @@ const handler = {
     data.logs = await loadLogs(config.GENSIS_BLOCK_NUMBER, data.infos);
     data.providers = await populateProviders(data);
     data.roi = await populateRoi(data);
-    //await populateVolume(data);
+    await populateVolume(data);
   }
 
   main();
