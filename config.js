@@ -1,8 +1,8 @@
 const web3 = require('web3');
 const FACTORY_ABI = require('./abi/factory.json');
 const EXCHANGE_ABI = require('./abi/exchange.json');
+const ERC_20_ABI = require('./abi/erc_20.json');
 const STR_ERC_20_ABI = require('./abi/str_erc_20.json');
-
 
 const EVENT_TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const EVENT_TOKEN_PURCHASE = '0xcd60aa75dea3072fbc07ae6d7d856b5dc5f4eee88854f5b4abf7b680ef8bc50f';
@@ -13,11 +13,13 @@ const ALL_EVENTS = [EVENT_TRANSFER, EVENT_TOKEN_PURCHASE, EVENT_ETH_PURCHASE, EV
 
 module.exports = {
   GENSIS_BLOCK_NUMBER: 1775445,
+  HISTORY_BEGIN_BLOCK: 1775000,
   HISTORY_CHUNK_SIZE: 5000,
   FACTORY_ADDRESS: '0x6A662F91E14312a11a2E35b359427AEf798fD928',
   FACTORY_ABI,
   EXCHANGE_ABI,
   STR_ERC_20_ABI,
+  ERC_20_ABI,
   ALL_EVENTS,
   EVENT_TRANSFER,
   EVENT_ADD_LIQUIDITY,
@@ -26,4 +28,5 @@ module.exports = {
   EVENT_TOKEN_PURCHASE,
   LOGS_BLOCKS_CHUNK: 500,
   ONE: web3.utils.toWei('1', 'ether'),
+  VET: 10 ** 18,
 };
