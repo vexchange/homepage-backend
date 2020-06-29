@@ -208,4 +208,6 @@ const filterObject = (obj, predicate) => {
     main();
   });
 
+  console.log('starting');
+
 })();
