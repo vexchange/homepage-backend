@@ -204,9 +204,8 @@ const filterObject = (obj, predicate) => {
     await populateLiquidityHistory(infos);
   }
 
-  // schedule.scheduleJob('*/30 * * * *', () => {
-  //   main();
-  // });
-  main();
+  schedule.scheduleJob('*/30 * * * *', () => {
+    main();
+  });
 
 })();
