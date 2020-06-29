@@ -5,10 +5,14 @@ const _ = require('lodash');
 const async = require("async");
 const moment = require('moment');
 const fs = require('fs');
+const schedule = require('node-schedule');
 const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
+const ethers = require('ethers').ethers;
 
-const web3 = thorify(new Web3(), 'http://45.32.212.120:8669/');
+const NODE_URL = 'http://45.32.212.120:8669';
+
+const web3 = thorify(new Web3(), NODE_URL);
 const dater = new EthDater(web3);
 
 const config = require('./config');
@@ -18,7 +22,25 @@ const vexchangeFactory = new web3.eth.Contract(
   config.FACTORY_ADDRESS,
 );
 
+const handler = {
+  get: function(target, name) {
+    return target.hasOwnProperty(name) ? target[name] : 0;
+  }
+};
+
+const filterObject = (obj, predicate) => {
+  return Object.keys(obj)
+    .filter(key => predicate(obj[key]))
+    .reduce((res, key) => (res[key] = obj[key], res), {})
+};
+
 (async () => {
+  const { Driver, SimpleNet } = ConnexDriver;
+
+  const driver = await Driver.connect(new SimpleNet(NODE_URL));
+  const connex = new Framework(driver);
+
+  const { number: CURRENT_BLOCK } = await web3.eth.getBlock("latest");
   const loadExchangeData = async ([tokenAddress, exchangeAddress]) => {
     const token = new web3.eth.Contract(
       config.STR_ERC_20_ABI,
@@ -182,5 +204,9 @@ const vexchangeFactory = new web3.eth.Contract(
     await populateLiquidityHistory(infos);
   }
 
+  // schedule.scheduleJob('*/30 * * * *', () => {
+  //   main();
+  // });
   main();
+
 })();
