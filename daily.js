@@ -202,7 +202,6 @@ const filterObject = (obj, predicate) => {
     let infos = [];
     try {
       let blocks = await dater.getEvery('minutes', moment().subtract(1, 'days'), moment(), 1, true);
-      console.log(blocks)
 
       infos = await loadExchangeInfos(infos);
 
