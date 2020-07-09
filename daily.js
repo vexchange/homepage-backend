@@ -10,7 +10,7 @@ const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
 const ethers = require('ethers').ethers;
 
-const NODE_URL = 'http://localhost:8669/';
+const NODE_URL = process.env.NODE_URL;
 
 const web3 = thorify(new Web3(), NODE_URL);
 const dater = new EthDater(web3);
@@ -129,9 +129,6 @@ const filterObject = (obj, predicate) => {
         info.volume = [];
 
         async.forEach(events, event => {
-          if (event.meta.txID.includes('0x84')) {
-            console.log(event)
-          }
           if (event.topics[0] === config.EVENT_ETH_PURCHASE) {
             let vetBought = ethers.utils.bigNumberify(event.decoded.eth_bought);
 
@@ -169,7 +166,9 @@ const filterObject = (obj, predicate) => {
         });
 
         fs.writeFileSync(`./data/volume/daily/${symbol}.json`, JSON.stringify(info));
-        //console.log('saved daily volume');
+        console.log('saved daily volume');
+      }).catch(error => {
+        console.log(error);
       });
     });
   };
@@ -185,6 +184,8 @@ const filterObject = (obj, predicate) => {
 
       const tokenBalance = await balanceOf.call(info.exchangeAddress).then(data => {
         return parseInt(ethers.utils.formatEther(data.decoded.balance));
+      }).catch(error => {
+        console.log(error);
       });
 
       const balanceHex = ethers.utils.bigNumberify(accountInfo.balance)
@@ -197,20 +198,26 @@ const filterObject = (obj, predicate) => {
   };
 
   const main = async () => {
-    //console.log('getting daily')
+    console.log('getting daily')
     let infos = [];
-    let blocks = await dater.getEvery('minutes', moment().subtract(1, 'days'), moment(), 1, true);
+    try {
+      let blocks = await dater.getEvery('minutes', moment().subtract(1, 'days'), moment(), 1, true);
+      console.log(blocks)
 
-    infos = await loadExchangeInfos(infos);
+      infos = await loadExchangeInfos(infos);
 
-    await loadDailyVolume(infos, blocks);
-    await populateLiquidityHistory(infos);
+      await loadDailyVolume(infos, blocks);
+      await populateLiquidityHistory(infos);
+    } catch(error) {
+      console.log(error);
+    }
   }
 
-
   console.log('starting');
+  main();
 
   schedule.scheduleJob('*/30 * * * *', () => {
+    console.log('updating');
     main();
   });
 })();
