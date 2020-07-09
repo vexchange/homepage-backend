@@ -218,7 +218,7 @@ const filterObject = (obj, predicate) => {
   main();
 
   schedule.scheduleJob('*/30 * * * *', () => {
-    console.log('updating');
+    console.log('updating: ', moment().format());
     main();
   });
 })();
