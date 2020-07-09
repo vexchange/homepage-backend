@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const Web3 = require("web3");
 const EthDater = require('ethereum-block-by-date');
 const thorify = require("thorify").thorify;
