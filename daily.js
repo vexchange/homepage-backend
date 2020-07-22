@@ -200,13 +200,12 @@ const filterObject = (obj, predicate) => {
   };
 
   const main = async () => {
+    const start = moment().startOf('day');
     const now = moment();
-    const start = now.startOf('day')
 
     let infos = [];
 
-    console.log('getting daily')
-
+    console.log('getting daily');
     try {
       let blocks = await dater.getEvery('minutes', start, now, 1, true);
 
