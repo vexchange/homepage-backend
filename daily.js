@@ -97,7 +97,7 @@ const filterObject = (obj, predicate) => {
     return newInfos;
   };
 
-  const loadDailyVolume = async (infos, blocks) => {
+  const loadDailyVolume = async (infos, startBlock) => {
     async.forEach(infos, info => {
       const symbol = info.symbol.toLowerCase();
 
@@ -112,8 +112,8 @@ const filterObject = (obj, predicate) => {
 
       const daily = {
         unit: 'block',
-        from: _.first(blocks).block,
-        to: _.last(blocks).block,
+        from: startBlock.block,
+        to: CURRENT_BLOCK,
       };
 
       const limit = 256;
@@ -201,17 +201,15 @@ const filterObject = (obj, predicate) => {
 
   const main = async () => {
     const start = moment().startOf('day');
-    const now = moment();
 
     let infos = [];
 
-    console.log('getting daily');
     try {
-      let blocks = await dater.getEvery('minutes', start, now, 1, true);
+      let [ startBlock ] = await dater.getEvery('days', start, start);
 
       infos = await loadExchangeInfos(infos);
 
-      await loadDailyVolume(infos, blocks);
+      await loadDailyVolume(infos, startBlock);
       await populateLiquidityHistory(infos);
     } catch(error) {
       console.log(error);
