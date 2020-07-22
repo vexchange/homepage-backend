@@ -5,7 +5,7 @@ const EthDater = require('ethereum-block-by-date');
 const thorify = require("thorify").thorify;
 const _ = require('lodash');
 const async = require("async");
-const moment = require('moment');
+const moment = require('moment-timezone');
 const fs = require('fs');
 const schedule = require('node-schedule');
 const Framework = require('@vechain/connex-framework').Framework;
@@ -200,12 +200,13 @@ const filterObject = (obj, predicate) => {
   };
 
   const main = async () => {
-    const start = moment().startOf('day');
+    let start = moment().startOf('day');
+    start.tz('America/New_York');
 
     let infos = [];
 
     try {
-      let [ startBlock ] = await dater.getEvery('days', start, start);
+      let startBlock = await dater.getDate(start);
 
       infos = await loadExchangeInfos(infos);
 
