@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const Web3 = require("web3");
-const EthDater = require('ethereum-block-by-date');
 const thorify = require("thorify").thorify;
 const _ = require('lodash');
 const async = require("async");
@@ -15,7 +14,6 @@ const ethers = require('ethers').ethers;
 const NODE_URL = process.env.NODE_URL;
 
 const web3 = thorify(new Web3(), NODE_URL);
-const dater = new EthDater(web3);
 
 const config = require('./config');
 
@@ -42,7 +40,8 @@ const filterObject = (obj, predicate) => {
   const driver = await Driver.connect(new SimpleNet(NODE_URL));
   const connex = new Framework(driver);
 
-  const { number: CURRENT_BLOCK } = await web3.eth.getBlock("latest");
+  const { number: CURRENT_BLOCK } = connex.thor.status.head;
+
   const loadExchangeData = async ([tokenAddress, exchangeAddress]) => {
     const token = new web3.eth.Contract(
       config.STR_ERC_20_ABI,
@@ -112,7 +111,7 @@ const filterObject = (obj, predicate) => {
 
       const daily = {
         unit: 'block',
-        from: startBlock.block,
+        from: startBlock.block.number,
         to: CURRENT_BLOCK,
       };
 
@@ -199,14 +198,41 @@ const filterObject = (obj, predicate) => {
     });
   };
 
+  const getStartBlock = async () => {
+    const start = moment().startOf('day');
+    const target = moment.tz(start, "America/New_York").unix();
+
+    let averageBlockTime = 17 * 1.5;
+
+    let block = await connex.thor.block(CURRENT_BLOCK).get();
+
+    let blockNumber = block.number;
+
+    let requestsMade = 0;
+
+    while (block.timestamp > target) {
+      let decreaseBlocks = (block.timestamp - target) / averageBlockTime;
+      decreaseBlocks = parseInt(decreaseBlocks);
+
+      if (decreaseBlocks < 1) {
+        break;
+      }
+
+      blockNumber -= decreaseBlocks;
+
+      block = await connex.thor.block(blockNumber).get();
+      requestsMade += 1
+    }
+
+    return { block, requestsMade };
+  };
+
   const main = async () => {
-    let start = moment().startOf('day');
-    start.tz('America/New_York');
+    const startBlock = await getStartBlock();
 
     let infos = [];
 
     try {
-      let startBlock = await dater.getDate(start);
 
       infos = await loadExchangeInfos(infos);
 
@@ -224,4 +250,6 @@ const filterObject = (obj, predicate) => {
     console.log('updating: ', moment().format());
     main();
   });
-})();
+})()
+
+
