@@ -200,10 +200,15 @@ const filterObject = (obj, predicate) => {
   };
 
   const main = async () => {
-    console.log('getting daily')
+    const now = moment();
+    const start = now.startOf('day')
+
     let infos = [];
+
+    console.log('getting daily')
+
     try {
-      let blocks = await dater.getEvery('minutes', moment().subtract(1, 'days'), moment(), 1, true);
+      let blocks = await dater.getEvery('minutes', start, now, 1, true);
 
       infos = await loadExchangeInfos(infos);
 
