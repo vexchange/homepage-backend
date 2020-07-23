@@ -115,7 +115,7 @@ moment.tz.setDefault("America/New_York");
 
       const daily = {
         unit: 'block',
-        from: startBlock.block.number,
+        from: startBlock.block.number - 2,
         to: CURRENT_BLOCK,
       };
 
@@ -227,7 +227,7 @@ moment.tz.setDefault("America/New_York");
       requestsMade += 1
     }
 
-    return { block: block - 2, requestsMade };
+    return { block , requestsMade };
   };
 
   const main = async () => {
