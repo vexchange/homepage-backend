@@ -10,6 +10,7 @@ const schedule = require('node-schedule');
 const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
 const ethers = require('ethers').ethers;
+const date = require('date-fns');
 
 const NODE_URL = process.env.NODE_URL;
 
@@ -33,6 +34,9 @@ const filterObject = (obj, predicate) => {
     .filter(key => predicate(obj[key]))
     .reduce((res, key) => (res[key] = obj[key], res), {})
 };
+
+moment.tz.setDefault("America/New_York");
+//moment.tz.setDefault("Asia/Taipei");
 
 (async () => {
   const { Driver, SimpleNet } = ConnexDriver;
@@ -199,8 +203,7 @@ const filterObject = (obj, predicate) => {
   };
 
   const getStartBlock = async () => {
-    const start = moment().startOf('day');
-    const target = moment.tz(start, "America/New_York").unix();
+    const target = moment().startOf('day').unix();
 
     let averageBlockTime = 17 * 1.5;
 
@@ -224,7 +227,7 @@ const filterObject = (obj, predicate) => {
       requestsMade += 1
     }
 
-    return { block, requestsMade };
+    return { block: block - 2, requestsMade };
   };
 
   const main = async () => {
@@ -250,6 +253,5 @@ const filterObject = (obj, predicate) => {
     console.log('updating: ', moment().format());
     main();
   });
-})()
-
+})();
 
