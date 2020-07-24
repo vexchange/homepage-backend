@@ -6,7 +6,7 @@ const _ = require('lodash');
 const async = require("async");
 const moment = require('moment-timezone');
 const fs = require('fs');
-const schedule = require('node-schedule');
+const CronJob = require('cron').CronJob;
 const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
 const ethers = require('ethers').ethers;
@@ -36,7 +36,6 @@ const filterObject = (obj, predicate) => {
 };
 
 moment.tz.setDefault("America/New_York");
-//moment.tz.setDefault("Asia/Taipei");
 
 (async () => {
   const { Driver, SimpleNet } = ConnexDriver;
@@ -171,7 +170,6 @@ moment.tz.setDefault("America/New_York");
         });
 
         fs.writeFileSync(`./data/volume/daily/${symbol}.json`, JSON.stringify(info));
-        console.log('saved daily volume');
       }).catch(error => {
         console.log(error);
       });
@@ -246,12 +244,11 @@ moment.tz.setDefault("America/New_York");
     }
   }
 
-  console.log('starting: ', moment().format());
-  main();
-
-  schedule.scheduleJob('*/30 * * * *', () => {
-    console.log('updating: ', moment().format());
+  const job = new CronJob('*/30 * * * *', () => {
     main();
   });
+
+  main();
+  job.start();
 })();
 
