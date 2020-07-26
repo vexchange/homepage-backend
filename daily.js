@@ -244,11 +244,10 @@ moment.tz.setDefault("America/New_York");
     }
   }
 
-  const job = new CronJob('*/30 * * * *', () => {
-    main();
-  });
+  //const job = new CronJob('*/30 * * * *', () => {
+  //  main();
+  //});
 
   main();
-  job.start();
 })();
 
