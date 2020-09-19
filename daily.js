@@ -4,13 +4,11 @@ const Web3 = require("web3");
 const thorify = require("thorify").thorify;
 const _ = require('lodash');
 const async = require("async");
-const moment = require('moment-timezone');
+const moment = require('moment');
 const fs = require('fs');
-const CronJob = require('cron').CronJob;
 const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
 const ethers = require('ethers').ethers;
-const date = require('date-fns');
 
 const NODE_URL = process.env.NODE_URL;
 
@@ -34,8 +32,6 @@ const filterObject = (obj, predicate) => {
     .filter(key => predicate(obj[key]))
     .reduce((res, key) => (res[key] = obj[key], res), {})
 };
-
-moment.tz.setDefault("America/New_York");
 
 (async () => {
   const { Driver, SimpleNet } = ConnexDriver;
@@ -104,8 +100,6 @@ moment.tz.setDefault("America/New_York");
     const to = moment().unix();
 
     async.forEach(infos, info => {
-      if (info.symbol !== 'JUR') return;
-
       const symbol = info.symbol.toLowerCase();
 
       let ethPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'EthPurchase' });
