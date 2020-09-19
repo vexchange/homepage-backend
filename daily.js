@@ -99,7 +99,10 @@ moment.tz.setDefault("America/New_York");
     return newInfos;
   };
 
-  const loadDailyVolume = async (infos, startBlock) => {
+  const loadDailyVolume = async (infos) => {
+    const from = moment().subtract(1, 'days').unix();
+    const to = moment().unix();
+
     async.forEach(infos, info => {
       if (info.symbol !== 'JUR') return;
 
@@ -114,11 +117,7 @@ moment.tz.setDefault("America/New_York");
       let ethPurchaseFilter = ethPurchaseEvent.filter([]);
       let tokenPurchaseFilter = tokenPurchaseEvent.filter([]);
 
-      const daily = {
-        unit: 'block',
-        from: startBlock.block.number - 2,
-        to: CURRENT_BLOCK,
-      };
+      const daily = { unit: 'time', from, to };
 
       const limit = 256;
 
@@ -202,44 +201,14 @@ moment.tz.setDefault("America/New_York");
     });
   };
 
-  const getStartBlock = async () => {
-    const target = moment().startOf('day').unix();
-
-    let averageBlockTime = 17 * 1.5;
-
-    let block = await connex.thor.block(CURRENT_BLOCK).get();
-
-    let blockNumber = block.number;
-
-    let requestsMade = 0;
-
-    while (block.timestamp > target) {
-      let decreaseBlocks = (block.timestamp - target) / averageBlockTime;
-      decreaseBlocks = parseInt(decreaseBlocks);
-
-      if (decreaseBlocks < 1) {
-        break;
-      }
-
-      blockNumber -= decreaseBlocks;
-
-      block = await connex.thor.block(blockNumber).get();
-      requestsMade += 1
-    }
-
-    return { block , requestsMade };
-  };
-
   const main = async () => {
-    const startBlock = await getStartBlock();
-
     let infos = [];
 
     try {
 
       infos = await loadExchangeInfos(infos);
 
-      await loadDailyVolume(infos, startBlock);
+      await loadDailyVolume(infos);
       await populateLiquidityHistory(infos);
     } catch(error) {
       console.log(error);
