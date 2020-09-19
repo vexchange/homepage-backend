@@ -101,6 +101,8 @@ moment.tz.setDefault("America/New_York");
 
   const loadDailyVolume = async (infos, startBlock) => {
     async.forEach(infos, info => {
+      if (info.symbol !== 'JUR') return;
+
       const symbol = info.symbol.toLowerCase();
 
       let ethPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'EthPurchase' });
@@ -133,12 +135,12 @@ moment.tz.setDefault("America/New_York");
         info.volume = [];
 
         async.forEach(events, event => {
-          if (event.topics[0] === config.EVENT_ETH_PURCHASE) {
+          if (event.topics.includes(config.EVENT_ETH_PURCHASE)) {
             let vetBought = ethers.utils.bigNumberify(event.decoded.eth_bought);
 
-            tradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought)) / 0.997;
-            totalTradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought)) / 0.997;
-          } else if (event.topics[0] === config.EVENT_TOKEN_PURCHASE) {
+            tradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought));
+            totalTradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought));
+          } else if (event.topics.includes(config.EVENT_TOKEN_PURCHASE)) {
             let vetSold = ethers.utils.bigNumberify(event.decoded.eth_sold);
 
             tradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
