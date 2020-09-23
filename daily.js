@@ -9,6 +9,8 @@ const fs = require('fs');
 const Framework = require('@vechain/connex-framework').Framework;
 const ConnexDriver = require('@vechain/connex-driver');
 const ethers = require('ethers').ethers;
+const axios = require('axios');
+const abi = require('thor-devkit').abi;
 
 const NODE_URL = process.env.NODE_URL;
 
@@ -99,75 +101,83 @@ const filterObject = (obj, predicate) => {
     const from = moment().subtract(1, 'days').unix();
     const to = moment().unix();
 
-    async.forEach(infos, info => {
+    async.forEach(infos, async info => {
       const symbol = info.symbol.toLowerCase();
 
-      let ethPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'EthPurchase' });
-      let ethPurchaseEvent = connex.thor.account(info.exchangeAddress).event(ethPurchaseABI);
-
-      let tokenPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'TokenPurchase' });
-      let tokenPurchaseEvent = connex.thor.account(info.exchangeAddress).event(tokenPurchaseABI);
-
-      let ethPurchaseFilter = ethPurchaseEvent.filter([]);
-      let tokenPurchaseFilter = tokenPurchaseEvent.filter([]);
-
-      const daily = { unit: 'time', from, to };
-
-      const limit = 256;
-
-      Promise.all([
-        ethPurchaseFilter.order('desc').range(daily).apply(0, limit),
-        tokenPurchaseFilter.order('desc').range(daily).apply(0, limit),
-      ]).then(([vetPurchaseEvents, tokenPurchaseEvents]) => {
-        const events = [...vetPurchaseEvents, ...tokenPurchaseEvents];
-        let totalTradeVolume = new Proxy({}, handler);
-
-        let tradeVolume = new Proxy({}, handler);
-        let volume = [];
-        let info = {};
-        info.volume = [];
-
-        async.forEach(events, event => {
-          if (event.topics.includes(config.EVENT_ETH_PURCHASE)) {
-            let vetBought = ethers.utils.bigNumberify(event.decoded.eth_bought);
-
-            tradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought));
-            totalTradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetBought));
-          } else if (event.topics.includes(config.EVENT_TOKEN_PURCHASE)) {
-            let vetSold = ethers.utils.bigNumberify(event.decoded.eth_sold);
-
-            tradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
-            totalTradeVolume[event.decoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
-          }
-        });
-
-        volume.push(tradeVolume);
-
-        let totalVolume = _.sum(Object.values(totalTradeVolume));
-        valuableTraders = filterObject(totalTradeVolume, vol => vol > totalVolume / 1000);
-        valuableTraders = Object.keys(valuableTraders);
-
-        info.totalVolume = totalVolume;
-        info.valuableTraders = valuableTraders;
-
-        async.forEach(volume, vol => {
-          let filteredVol = new Proxy({}, handler);
-
-          for (let trader in vol) {
-            if (valuableTraders.includes(trader)) {
-              filteredVol[trader] = vol[trader];
-            } else {
-              filteredVol.Other += vol[trader];
-            }
-          }
-
-          info.volume.push(filteredVol);
-        });
-
-        fs.writeFileSync(`./data/volume/daily/${symbol}.json`, JSON.stringify(info));
-      }).catch(error => {
-        console.log(error);
+      let { data } = await axios.post(`http://localhost:8669/logs/event`, {
+        "order": "desc",
+        range: { unit: 'time', from, to },
+        criteriaSet: [
+          {
+            address: info.exchangeAddress,
+            topic0: config.EVENT_TOKEN_PURCHASE,
+          },
+          {
+            address: info.exchangeAddress,
+            topic0: config.EVENT_ETH_PURCHASE,
+          },
+        ]
       });
+
+      let ethPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'EthPurchase' });
+      let tokenPurchaseABI = _.find(config.EXCHANGE_ABI, { name: 'TokenPurchase' });
+
+      let totalTradeVolume = new Proxy({}, handler);
+
+      let tradeVolume = new Proxy({}, handler);
+      let volume = [];
+      info.volume = [];
+
+      async.forEach(data, event => {
+        switch(event.topics[0]) {
+          case config.EVENT_TOKEN_PURCHASE:
+            const tokenPurchaseEvent = new abi.Event(tokenPurchaseABI);
+            const tokenPurchaseDecoded = tokenPurchaseEvent.decode(event.data, event.topics);
+
+            let vetSold = ethers.utils.bigNumberify(tokenPurchaseDecoded.eth_sold);
+
+            tradeVolume[tokenPurchaseDecoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
+            totalTradeVolume[tokenPurchaseDecoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
+
+            break;
+          case config.EVENT_ETH_PURCHASE:
+            const ethPurchaseEvent = new abi.Event(ethPurchaseABI);
+            const ethPurchaseDecode = ethPurchaseEvent.decode(event.data, event.topics);
+
+            let vetBought = ethers.utils.bigNumberify(ethPurchaseDecode.eth_bought);
+
+            tradeVolume[ethPurchaseDecode.buyer] += parseInt(ethers.utils.formatEther(vetBought));
+            totalTradeVolume[ethPurchaseDecode.buyer] += parseInt(ethers.utils.formatEther(vetBought));
+            break;
+          default:
+            break;
+        }
+      });
+
+      volume.push(tradeVolume);
+
+      let totalVolume = _.sum(Object.values(totalTradeVolume));
+      valuableTraders = filterObject(totalTradeVolume, vol => vol > totalVolume / 1000);
+      valuableTraders = Object.keys(valuableTraders);
+
+      info.totalVolume = totalVolume;
+      info.valuableTraders = valuableTraders;
+
+      async.forEach(volume, vol => {
+        let filteredVol = new Proxy({}, handler);
+
+        for (let trader in vol) {
+          if (valuableTraders.includes(trader)) {
+            filteredVol[trader] = vol[trader];
+          } else {
+            filteredVol.Other += vol[trader];
+          }
+        }
+
+        info.volume.push(filteredVol);
+      });
+
+      fs.writeFileSync(`./data/volume/daily/${symbol}.json`, JSON.stringify({ totalVolume: info.totalVolume }));
     });
   };
 
@@ -208,10 +218,6 @@ const filterObject = (obj, predicate) => {
       console.log(error);
     }
   }
-
-  //const job = new CronJob('*/30 * * * *', () => {
-  //  main();
-  //});
 
   main();
 })();
