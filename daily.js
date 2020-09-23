@@ -104,7 +104,7 @@ const filterObject = (obj, predicate) => {
     async.forEach(infos, async info => {
       const symbol = info.symbol.toLowerCase();
 
-      let { data } = await axios.post(`http://localhost:8669/logs/event`, {
+      let { data } = await axios.post(`http://45.32.212.120:8669/logs/event`, {
         "order": "desc",
         range: { unit: 'time', from, to },
         criteriaSet: [
