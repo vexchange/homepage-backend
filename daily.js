@@ -134,7 +134,7 @@ const filterObject = (obj, predicate) => {
             const tokenPurchaseEvent = new abi.Event(tokenPurchaseABI);
             const tokenPurchaseDecoded = tokenPurchaseEvent.decode(event.data, event.topics);
 
-            let vetSold = ethers.utils.bigNumberify(tokenPurchaseDecoded.eth_sold);
+            let vetSold = ethers.BigNumber.from(tokenPurchaseDecoded.eth_sold);
 
             tradeVolume[tokenPurchaseDecoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
             totalTradeVolume[tokenPurchaseDecoded.buyer] += parseInt(ethers.utils.formatEther(vetSold));
@@ -144,7 +144,7 @@ const filterObject = (obj, predicate) => {
             const ethPurchaseEvent = new abi.Event(ethPurchaseABI);
             const ethPurchaseDecode = ethPurchaseEvent.decode(event.data, event.topics);
 
-            let vetBought = ethers.utils.bigNumberify(ethPurchaseDecode.eth_bought);
+            let vetBought = ethers.BigNumber.from(ethPurchaseDecode.eth_bought);
 
             tradeVolume[ethPurchaseDecode.buyer] += parseInt(ethers.utils.formatEther(vetBought));
             totalTradeVolume[ethPurchaseDecode.buyer] += parseInt(ethers.utils.formatEther(vetBought));
@@ -182,7 +182,8 @@ const filterObject = (obj, predicate) => {
   };
 
   const populateLiquidityHistory = async infos => {
-    async.forEach(infos, async info => {
+    for (const info of infos) {
+
       const symbol = info.symbol.toLowerCase();
       const account = connex.thor.account(info.exchangeAddress);
       const accountInfo = await account.get();
@@ -190,19 +191,17 @@ const filterObject = (obj, predicate) => {
       const balanceOfABI = _.find(config.ERC_20_ABI, { name: 'balanceOf' });
       const balanceOf = connex.thor.account(info.tokenAddress).method(balanceOfABI);
 
-      const tokenBalance = await balanceOf.call(info.exchangeAddress).then(data => {
-        return parseInt(ethers.utils.formatEther(data.decoded.balance));
-      }).catch(error => {
-        console.log(error);
-      });
+      let tokenBalance = await balanceOf.call(info.exchangeAddress);
+      tokenBalance = ethers.FixedNumber.fromValue(tokenBalance.decoded.balance, info.decimals);
+      tokenBalance = parseInt(tokenBalance.toString());
 
-      const balanceHex = ethers.utils.bigNumberify(accountInfo.balance)
+      const balanceHex = ethers.BigNumber.from(accountInfo.balance);
       const balance = parseInt(ethers.utils.formatEther(balanceHex));
 
       const data = { balance, tokenBalance };
       fs.writeFileSync(`./data/liquidity/daily/${symbol}.json`, JSON.stringify( data ));
-      //console.log('saved liquidity');
-    });
+      console.log('saved liquidity');
+    };
   };
 
   const main = async () => {
