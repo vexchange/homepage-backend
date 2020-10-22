@@ -191,21 +191,28 @@ const filterObject = (obj, predicate) => {
       const balanceOfABI = _.find(config.ERC_20_ABI, { name: 'balanceOf' });
       const balanceOf = connex.thor.account(info.tokenAddress).method(balanceOfABI);
 
-      let tokenBalance = await balanceOf.call(info.exchangeAddress);
-      tokenBalance = ethers.FixedNumber.fromValue(tokenBalance.decoded.balance, info.decimals);
-      tokenBalance = parseInt(tokenBalance.toString());
+      try {
+        let tokenBalance = await balanceOf.call(info.exchangeAddress);
+        tokenBalance = ethers.FixedNumber.fromValue(tokenBalance.decoded.balance, info.decimals);
+        tokenBalance = parseInt(tokenBalance.toString());
 
-      const balanceHex = ethers.BigNumber.from(accountInfo.balance);
-      const balance = parseInt(ethers.utils.formatEther(balanceHex));
+        const balanceHex = ethers.BigNumber.from(accountInfo.balance);
+        const balance = parseInt(ethers.utils.formatEther(balanceHex));
 
-      const data = { balance, tokenBalance };
-      fs.writeFileSync(`./data/liquidity/daily/${symbol}.json`, JSON.stringify( data ));
-      console.log('saved liquidity');
+        const data = { balance, tokenBalance };
+        fs.writeFileSync(`./data/liquidity/daily/${symbol}.json`, JSON.stringify( data ));
+        console.log(`${symbol}: saved liquidity`);
+
+      } catch(error) {
+        console.log(error);
+      }
     };
   };
 
   const main = async () => {
     let infos = [];
+
+    infos = await loadExchangeInfos(infos);
 
     try {
 
