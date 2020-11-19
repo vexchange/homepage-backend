@@ -204,7 +204,7 @@ const filterObject = (obj, predicate) => {
         console.log(`${symbol}: saved liquidity`);
 
       } catch(error) {
-        console.log(error);
+        console.log(`there's an error with ${symbol}`, error);
       }
     };
   };
